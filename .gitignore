@@ -1,0 +1,9 @@
+# venv
+badminton/
+
+# secret files
+credentials.json
+.env
+
+# data
+db/
