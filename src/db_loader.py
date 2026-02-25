@@ -32,7 +32,7 @@ def load_main_sheets(spreadsheet, conn):
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
-        # 빈 행 제거 ← 추가
+        # 빈 행 제거
         df = df[df["날짜"] != ""] if "날짜" in df.columns else df
 
         df["season"] = "전체"
