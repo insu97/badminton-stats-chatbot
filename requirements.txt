@@ -2,3 +2,9 @@ gspread
 pandas
 sqlalchemy
 dotenv
+langchain-openai
+faiss-cpu
+tiktoken
+langchain-community
+langchain
+langchain-text-splitters
