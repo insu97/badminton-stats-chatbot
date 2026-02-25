@@ -7,3 +7,5 @@ credentials.json
 
 # data
 db/
+data/reviews/*.txt
+!data/reviews/sample_review.txt
