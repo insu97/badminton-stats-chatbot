@@ -9,3 +9,8 @@ credentials.json
 db/
 data/reviews/*.txt
 !data/reviews/sample_review.txt
+
+# Python 캐시
+__pycache__/
+*.pyc
+*.pyo

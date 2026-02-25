@@ -2,29 +2,25 @@ from langchain_core.prompts import PromptTemplate
 
 # Text-to-SQL 프롬프트
 TEXT_TO_SQL_PROMPT = PromptTemplate(
-    input_variables=["schema", "question"],
+    input_variables=["input", "table_info", "top_k"],
     template="""
 당신은 배드민턴 경기 기록 데이터베이스 전문가입니다.
 아래 테이블 구조를 참고하여 질문에 맞는 SQL 쿼리를 작성하세요.
 
 [테이블 구조]
-{schema}
-
-[테이블 설명]
-- match_records: 경기 기록 (경기번호, 날짜, 팀A-1, 팀A-2, 팀B-1, 팀B-2, 점수A, 점수B, 승리팀, 점수차, season)
-- player_stats: 개인 통계 (선수, 총경기, 승리, 패배, 승률, 총득점, 총실점, 득실차, 평균득점, season)
-- pair_stats: 파트너 조합 통계 (선수1, 선수2, 경기수, 승리, 패배, 승률, season)
+{table_info}
 
 [규칙]
 - 반드시 SQLite 문법을 사용하세요
 - 선수 이름은 정확하게 매칭하세요
 - season 컬럼은 '전체' 또는 '시즌1' 값을 가집니다
-- SQL 쿼리만 반환하고 다른 설명은 하지 마세요
+- 최대 {top_k}개의 결과를 반환하세요
+- SQL 쿼리만 반환하고 마크다운 코드 블록(```)을 절대 사용하지 마세요
 
 [질문]
-{question}
+{input}
 
-[SQL 쿼리]
+SQL 쿼리만 반환하세요.
 """
 )
 
@@ -66,5 +62,17 @@ ROUTER_PROMPT = PromptTemplate(
 반드시 "sql" 또는 "rag" 중 하나만 반환하세요.
 
 [유형]
+"""
+)
+
+ANSWER_PROMPT = PromptTemplate(
+    input_variables=["question", "sql_result"],
+    template="""
+다음 질문과 SQL 실행 결과를 바탕으로 자연스러운 한국어로 답변하세요.
+
+질문: {question}
+SQL 실행 결과: {sql_result}
+
+답변:
 """
 )

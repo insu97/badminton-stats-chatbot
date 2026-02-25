@@ -1,0 +1,101 @@
+import os
+import re
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain_community.utilities import SQLDatabase
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.prompts import PromptTemplate
+
+from src.prompts import TEXT_TO_SQL_PROMPT, RAG_PROMPT, ROUTER_PROMPT, ANSWER_PROMPT
+from src.rag_loader import get_retriever
+
+load_dotenv()
+
+def get_llm():
+    return ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0,
+        openai_api_key=os.getenv("OPENAI_API_KEY")
+    )
+
+def clean_sql(sql: str) -> str:
+    """SQL 쿼리만 추출"""
+    # 마크다운 코드 블록 제거
+    sql = re.sub(r"```sql|```", "", sql)
+    
+    # SQLQuery: 이후 SQLResult: 이전 부분만 추출
+    if "SQLQuery:" in sql:
+        sql = sql.split("SQLQuery:")[-1]
+    if "SQLResult:" in sql:
+        sql = sql.split("SQLResult:")[0]
+    
+    return sql.strip()
+
+def get_sql_answer(question: str) -> str:
+    """직접 SQL 생성 → 실행 → 자연어 답변 생성"""
+    llm = get_llm()
+    db = SQLDatabase.from_uri("sqlite:///db/badminton.db")
+
+    # 1단계 - SQL 생성
+    sql_chain = TEXT_TO_SQL_PROMPT | llm | StrOutputParser()
+    # SQL 생성
+    sql_query = sql_chain.invoke({
+        "input": question,
+        "table_info": db.get_table_info(),
+        "top_k": 5
+    })
+
+    # clean_sql로 순수 SQL만 추출
+    sql_query = clean_sql(sql_query)
+
+    # SQL 실행
+    sql_result = db.run(sql_query)
+    
+    answer_chain = ANSWER_PROMPT | llm | StrOutputParser()
+    return answer_chain.invoke({
+        "question": question,
+        "sql_result": sql_result
+    })
+
+def get_rag_chain():
+    """RAG 체인 생성"""
+    llm = get_llm()
+    retriever = get_retriever()
+
+    chain = (
+        {"context": retriever, "question": RunnablePassthrough()}
+        | RAG_PROMPT
+        | llm
+        | StrOutputParser()
+    )
+    return chain
+
+def route_question(question: str) -> str:
+    """질문 유형 판단 (sql / rag)"""
+    llm = get_llm()
+    chain = ROUTER_PROMPT | llm | StrOutputParser()
+    result = chain.invoke({"question": question})
+    return result.strip().lower()
+
+def ask(question: str) -> str:
+    """질문 유형에 따라 체인 분기"""
+    question_type = route_question(question)
+    print(f"🔀 질문 유형: {question_type}")
+
+    if question_type == "sql":
+        return get_sql_answer(question)
+    else:
+        chain = get_rag_chain()
+        return chain.invoke(question)
+
+if __name__ == "__main__":
+    # 테스트
+    sql_question = "박인수 승률이 어떻게 돼?"
+    rag_question = "최근 경기에서 변형섭 컨디션이 어땠어?"
+
+    print("\n[SQL 테스트]")
+    print(ask(sql_question))
+
+    print("\n[RAG 테스트]")
+    print(ask(rag_question))
