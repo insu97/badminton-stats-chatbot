@@ -8,3 +8,4 @@ tiktoken
 langchain-community
 langchain
 langchain-text-splitters
+langchain-core
