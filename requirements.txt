@@ -10,3 +10,4 @@ langchain
 langchain-text-splitters
 langchain-core
 langchain-experimental
+streamlit

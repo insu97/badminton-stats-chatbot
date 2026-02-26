@@ -77,7 +77,7 @@ python src/rag_loader.py
 
 **5. 앱 실행**
 ```bash
-streamlit run app.py
+streamlit run streamlit_app.py
 ```
 
 ## 📊 데이터 구조
