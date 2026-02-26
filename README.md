@@ -17,7 +17,7 @@ Google Sheets에 기록된 배드민턴 경기 데이터를 SQLite DB로 변환�
 | Database | SQLite, FAISS |
 | Framework | LangChain, Streamlit |
 | Data | Google Sheets API (gspread) |
-| LLM | OpenAI GPT |
+| LLM | OpenAI GPT-4o-mini |
 | Embedding | OpenAI Embeddings |
 
 ## 📁 프로젝트 구조
@@ -25,9 +25,10 @@ Google Sheets에 기록된 배드민턴 경기 데이터를 SQLite DB로 변환�
 ```
 badminton-stats-chatbot/
 ├── src/
+│   ├── __init__.py
 │   ├── db_loader.py    # Google Sheets → SQLite 변환
 │   ├── rag_loader.py   # 경기 후기 RAG 파이프라인
-│   ├── chain.py        # LangChain Text-to-SQL 체인
+│   ├── chain.py        # LangChain Text-to-SQL + RAG 체인
 │   └── prompts.py      # 프롬프트 템플릿
 ├── data/
 │   └── reviews/        # 경기 후기 텍스트 파일
@@ -35,7 +36,7 @@ badminton-stats-chatbot/
 ├── db/
 │   ├── badminton.db    # SQLite DB
 │   └── faiss/          # FAISS Vector DB
-├── app.py              # Streamlit 메인 앱
+├── streamlit_app.py    # Streamlit 메인 앱
 ├── requirements.txt
 └── .env.example
 ```
@@ -48,6 +49,7 @@ badminton-stats-chatbot/
 - 질문 유형에 따라 Text-to-SQL / RAG 자동 분기
 - 시즌별 / 전체 경기 데이터 조회
 - 개인 통계 및 파트너 조합 승률 조회
+- 사이드바 데이터 갱신 버튼으로 실시간 업데이트
 
 ## ⚙️ 실행 방법
 
