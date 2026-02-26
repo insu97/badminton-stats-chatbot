@@ -2,12 +2,25 @@
 
 > 배드민턴 경기 기록 데이터를 기반으로 자연어로 질문할 수 있는 챗봇
 
+🔗 **[Live Demo](https://bm-stats-chatbot.streamlit.app/)**
+
 ## 📌 프로젝트 소개
 
 Google Sheets에 기록된 배드민턴 경기 데이터를 SQLite DB로 변환하고, 경기 후기 텍스트 데이터를 FAISS Vector DB에 저장하여 자연어 질문에 답하는 하이브리드 챗봇입니다.
 
 - **통계 질문** → Text-to-SQL 방식으로 SQLite DB에서 정확한 수치 조회
 - **후기/메모 질문** → RAG 파이프라인으로 FAISS Vector DB에서 유사 문서 검색
+
+## 📸 스크린샷
+
+**챗봇 메인 화면**
+![main](assets/main.png)
+
+**통계 질문 답변 예시**
+![sql_example](assets/sql_example.png)
+
+**후기 질문 답변 예시**
+![rag_example](assets/rag_example.png)
 
 ## 🛠 기술 스택
 
@@ -30,6 +43,7 @@ badminton-stats-chatbot/
 │   ├── rag_loader.py   # 경기 후기 RAG 파이프라인
 │   ├── chain.py        # LangChain Text-to-SQL + RAG 체인
 │   └── prompts.py      # 프롬프트 템플릿
+├── assets/             # 스크린샷 이미지
 ├── data/
 │   └── reviews/        # 경기 후기 텍스트 파일
 │       └── sample_review.txt
