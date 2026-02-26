@@ -1,9 +1,11 @@
 import os
+import re
 import gspread
 import pandas as pd
 import sqlite3
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -11,6 +13,17 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets.readonly",
     "https://www.googleapis.com/auth/drive.readonly"
 ]
+
+def normalize_date(date_str: str) -> str:
+    """날짜 형식을 YYYY-MM-DD로 통일"""
+    if not date_str:
+        return date_str
+    date_str = re.sub(r'\s+', '', str(date_str))
+    date_str = date_str.replace('.', '-').strip('-')
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%d').strftime('%Y-%m-%d')
+    except:
+        return date_str
 
 def get_gsheet_client():
     creds = Credentials.from_service_account_file(
@@ -20,7 +33,6 @@ def get_gsheet_client():
     return gspread.authorize(creds)
 
 def load_main_sheets(spreadsheet, conn):
-    """경기기록, 개인통계, 조합통계 시트 로드 (season=전체)"""
     target_sheets = {
         "경기기록": "match_records",
         "개인통계": "player_stats",
@@ -34,6 +46,10 @@ def load_main_sheets(spreadsheet, conn):
 
         # 빈 행 제거
         df = df[df["날짜"] != ""] if "날짜" in df.columns else df
+
+        # 날짜 형식 통일
+        if "날짜" in df.columns:
+            df["날짜"] = df["날짜"].astype(str).apply(normalize_date)
 
         df["season"] = "전체"
         df.to_sql(table_name, conn, if_exists="replace", index=False)

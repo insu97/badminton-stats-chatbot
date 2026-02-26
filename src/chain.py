@@ -79,15 +79,32 @@ def route_question(question: str) -> str:
     return result.strip().lower()
 
 def ask(question: str) -> str:
-    """질문 유형에 따라 체인 분기"""
     question_type = route_question(question)
     print(f"🔀 질문 유형: {question_type}")
 
     if question_type == "sql":
         return get_sql_answer(question)
     else:
+        # 포괄적 질문 감지 시 선수 이름 포함한 쿼리로 보강
+        search_query = question
+        if any(keyword in question for keyword in ["선수들", "모든 선수", "전체", "요약"]):
+            search_query = f"변형섭 박인수 최승원 김연준 장호성 플레이 컨디션 {question}"
+
+        # 최근/마지막 키워드 처리
+        if any(keyword in question for keyword in ["최근", "마지막", "최신", "저번"]):
+            db = SQLDatabase.from_uri("sqlite:///db/badminton.db")
+            llm = get_llm()
+            sql_chain = TEXT_TO_SQL_PROMPT | llm | StrOutputParser()
+            sql_query = clean_sql(sql_chain.invoke({
+                "input": "가장 최근 경기 날짜가 언제야?",
+                "table_info": db.get_table_info(),
+                "top_k": 1
+            }))
+            latest_date = db.run(sql_query)
+            search_query = f"{search_query} (참고: 가장 최근 경기 날짜는 {latest_date})"
+
         chain = get_rag_chain()
-        return chain.invoke(question)
+        return chain.invoke(search_query)
 
 if __name__ == "__main__":
     # 테스트
