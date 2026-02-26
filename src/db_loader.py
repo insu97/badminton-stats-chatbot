@@ -26,10 +26,18 @@ def normalize_date(date_str: str) -> str:
         return date_str
 
 def get_gsheet_client():
-    creds = Credentials.from_service_account_file(
-        "credentials.json",
-        scopes=SCOPES
-    )
+    try:
+        # Streamlit Cloud 환경
+        import streamlit as st
+        import json
+        creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    except Exception:
+        # 로컬 환경
+        creds = Credentials.from_service_account_file(
+            "credentials.json",
+            scopes=SCOPES
+        )
     return gspread.authorize(creds)
 
 def load_main_sheets(spreadsheet, conn):
