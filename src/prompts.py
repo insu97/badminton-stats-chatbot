@@ -19,6 +19,7 @@ TEXT_TO_SQL_PROMPT = PromptTemplate(
 - 날짜는 YYYY-MM-DD 형식이며 최신 날짜 조회 시 반드시 ORDER BY 날짜 DESC를 사용하세요
 - "최근", "마지막", "최신" 등의 표현은 ORDER BY 날짜 DESC LIMIT 1로 처리하세요
 - 경기 결과 조회 시 팀A-1, 팀A-2, 팀B-1, 팀B-2, 점수A, 점수B, 승리팀을 반드시 포함하세요
+- 하이픈(-)이 포함된 컬럼명은 반드시 큰따옴표로 감싸세요 예: "팀A-1", "팀A-2", "팀B-1", "팀B-2"
 
 [질문]
 {input}
