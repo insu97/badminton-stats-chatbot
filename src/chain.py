@@ -85,12 +85,8 @@ def ask(question: str) -> str:
     if question_type == "sql":
         return get_sql_answer(question)
     else:
-        # 포괄적 질문 감지 시 선수 이름 포함한 쿼리로 보강
         search_query = question
-        if any(keyword in question for keyword in ["선수들", "모든 선수", "전체", "요약"]):
-            search_query = f"변형섭 박인수 최승원 김연준 장호성 플레이 컨디션 {question}"
 
-        # 최근/마지막 키워드 처리
         if any(keyword in question for keyword in ["최근", "마지막", "최신", "저번"]):
             db = SQLDatabase.from_uri("sqlite:///db/badminton.db")
             llm = get_llm()
