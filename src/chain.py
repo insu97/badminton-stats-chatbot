@@ -86,10 +86,11 @@ def ask(question: str) -> str:
         return get_sql_answer(question)
     else:
         search_query = question
+        db = SQLDatabase.from_uri("sqlite:///db/badminton.db")
+        llm = get_llm()
 
+        # 최근/마지막 키워드가 있으면 날짜를 먼저 확정하고 검색 쿼리에 반영
         if any(keyword in question for keyword in ["최근", "마지막", "최신", "저번"]):
-            db = SQLDatabase.from_uri("sqlite:///db/badminton.db")
-            llm = get_llm()
             sql_chain = TEXT_TO_SQL_PROMPT | llm | StrOutputParser()
             sql_query = clean_sql(sql_chain.invoke({
                 "input": "가장 최근 경기 날짜가 언제야?",
@@ -97,7 +98,9 @@ def ask(question: str) -> str:
                 "top_k": 1
             }))
             latest_date = db.run(sql_query)
-            search_query = f"{search_query} (참고: 가장 최근 경기 날짜는 {latest_date})"
+            # 날짜를 질문 앞에 명시적으로 추가
+            search_query = f"{latest_date} 날짜 경기 {question}"
+            print(f"🔍 검색 쿼리: {search_query}")
 
         chain = get_rag_chain()
         return chain.invoke(search_query)

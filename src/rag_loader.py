@@ -11,6 +11,7 @@ REVIEWS_DIR = "data/reviews"
 FAISS_DIR = "db/faiss"
 
 def load_reviews():
+    """txt 파일 로드 - 파일명에서 날짜 추출해서 메타데이터에 추가"""
     loader = DirectoryLoader(
         REVIEWS_DIR,
         glob="*.txt",
@@ -18,6 +19,18 @@ def load_reviews():
         loader_kwargs={"encoding": "utf-8"}
     )
     documents = loader.load()
+
+    # 파일명에서 날짜 추출해서 메타데이터에 추가
+    for doc in documents:
+        filename = os.path.basename(doc.metadata.get("source", ""))
+        date_match = re.search(r'(\d{8})', filename)
+        if date_match:
+            date_str = date_match.group(1)
+            formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
+            doc.metadata["date"] = formatted_date
+            # 날짜를 문서 내용 앞에 추가해서 검색 정확도 향상
+            doc.page_content = f"[날짜: {formatted_date}]\n{doc.page_content}"
+
     print(f"✅ {len(documents)}개 파일 로드 완료")
     return documents
 
