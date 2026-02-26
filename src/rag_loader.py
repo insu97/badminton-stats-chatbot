@@ -12,10 +12,9 @@ REVIEWS_DIR = "data/reviews"
 FAISS_DIR = "db/faiss"
 
 def load_reviews():
-    """txt 파일 로드 - 파일명에서 날짜 추출해서 메타데이터에 추가"""
     loader = DirectoryLoader(
         REVIEWS_DIR,
-        glob="*.txt",
+        glob="[!sample]*.txt",  # sample로 시작하는 파일 제외
         loader_cls=TextLoader,
         loader_kwargs={"encoding": "utf-8"}
     )
