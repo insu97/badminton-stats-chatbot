@@ -58,6 +58,8 @@ badminton-stats-chatbot/
 ## ✨ 주요 기능
 
 - Google Sheets 데이터 실시간 연동
+- Google Sheets 경기기록 기반 통계 자동 계산 (개인/조합)
+- 시즌 컬럼 기반 자동 시즌 감지 및 분류
 - 자연어 질문 → SQL 자동 변환 (Text-to-SQL)
 - 경기 후기 기반 RAG 파이프라인 (FAISS Vector DB)
 - 질문 유형에 따라 Text-to-SQL / RAG 자동 분기
@@ -98,13 +100,19 @@ streamlit run streamlit_app.py
 
 ## 📊 데이터 구조
 
-**SQLite DB**
+**Google Sheets**
+
+| 시트 | 설명 |
+|---|---|
+| 경기기록 | 경기 결과 입력 (시즌 컬럼으로 구분) |
+
+**SQLite DB (자동 생성)**
 
 | 테이블 | 설명 |
 |---|---|
-| match_records | 경기기록 (시즌1 + 전체) |
-| player_stats | 개인 통계 |
-| pair_stats | 파트너 조합 통계 |
+| match_records | 경기기록 |
+| player_stats | 개인 통계 (전체 + 시즌별 자동 계산) |
+| pair_stats | 파트너 조합 통계 (전체 + 시즌별 자동 계산) |
 
 **FAISS Vector DB**
 
