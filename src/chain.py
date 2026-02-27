@@ -30,7 +30,19 @@ def clean_sql(sql: str) -> str:
     if "SQLResult:" in sql:
         sql = sql.split("SQLResult:")[0]
     
-    return sql.strip()
+    sql = sql.strip()
+    
+    # 괄호 불균형 보정
+    open_count = sql.count('(')
+    close_count = sql.count(')')
+    if open_count > close_count:
+        # 세미콜론 앞에 닫는 괄호 추가
+        if sql.endswith(';'):
+            sql = sql[:-1] + ')' * (open_count - close_count) + ';'
+        else:
+            sql += ')' * (open_count - close_count)
+    
+    return sql
 
 def get_sql_answer(question: str) -> str:
     """직접 SQL 생성 → 실행 → 자연어 답변 생성"""
