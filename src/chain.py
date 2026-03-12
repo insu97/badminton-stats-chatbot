@@ -51,19 +51,25 @@ def get_sql_answer(question: str) -> str:
 
     # 1단계 - SQL 생성
     sql_chain = TEXT_TO_SQL_PROMPT | llm | StrOutputParser()
-    # SQL 생성
     sql_query = sql_chain.invoke({
         "input": question,
         "table_info": db.get_table_info(),
         "top_k": 5
     })
-
-    # clean_sql로 순수 SQL만 추출
     sql_query = clean_sql(sql_query)
+    print(f"🛠️ 생성된 SQL: {sql_query}")  # 디버깅용
 
-    # SQL 실행
-    sql_result = db.run(sql_query)
-    
+    # 2단계 - SQL 실행
+    try:
+        sql_result = db.run(sql_query)
+    except Exception as e:
+        return f"SQL 실행 중 오류가 발생했습니다: {e}"
+
+    # 빈 결과면 LLM 호출 없이 바로 반환
+    if not sql_result or sql_result.strip() in ["", "[]", "None"]:
+        return "DB에서 해당 데이터를 찾을 수 없습니다. 질문을 좀 더 구체적으로 해주세요."
+
+    # 3단계 - 결과 있을 때만 자연어 변환
     answer_chain = ANSWER_PROMPT | llm | StrOutputParser()
     return answer_chain.invoke({
         "question": question,
