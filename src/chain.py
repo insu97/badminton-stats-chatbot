@@ -44,12 +44,14 @@ def clean_sql(sql: str) -> str:
     
     return sql
 
-def get_sql_answer(question: str) -> str:
+def get_sql_answer(question: str, status_callback=None) -> str:
     """직접 SQL 생성 → 실행 → 자연어 답변 생성"""
     llm = get_llm()
     db = SQLDatabase.from_uri("sqlite:///db/badminton.db")
 
     # 1단계 - SQL 생성
+    if status_callback:
+        status_callback("sql_generate", "SQL 쿼리 생성 중...")
     sql_chain = TEXT_TO_SQL_PROMPT | llm | StrOutputParser()
     sql_query = sql_chain.invoke({
         "input": question,
@@ -60,16 +62,20 @@ def get_sql_answer(question: str) -> str:
     print(f"🛠️ 생성된 SQL: {sql_query}")  # 디버깅용
 
     # 2단계 - SQL 실행
+    if status_callback:
+        status_callback("sql_execute", "DB 조회 중...")
     try:
         sql_result = db.run(sql_query)
     except Exception as e:
-        return f"SQL 실행 중 오류가 발생했습니다: {e}"
+        return f"⚠️ SQL 실행 중 오류가 발생했습니다: {e}"
 
     # 빈 결과면 LLM 호출 없이 바로 반환
     if not sql_result or sql_result.strip() in ["", "[]", "None"]:
-        return "DB에서 해당 데이터를 찾을 수 없습니다. 질문을 좀 더 구체적으로 해주세요."
+        return "🔍 DB에서 해당 데이터를 찾을 수 없습니다. 질문을 좀 더 구체적으로 해주세요."
 
     # 3단계 - 결과 있을 때만 자연어 변환
+    if status_callback:
+        status_callback("answer_generate", "답변 생성 중...")
     answer_chain = ANSWER_PROMPT | llm | StrOutputParser()
     return answer_chain.invoke({
         "question": question,
@@ -96,12 +102,14 @@ def route_question(question: str) -> str:
     result = chain.invoke({"question": question})
     return result.strip().lower()
 
-def ask(question: str) -> str:
+def ask(question: str, status_callback=None) -> str:
+    if status_callback:
+        status_callback("route", "질문 유형 분석 중...")
     question_type = route_question(question)
     print(f"🔀 질문 유형: {question_type}")
 
     if question_type == "sql":
-        return get_sql_answer(question)
+        return get_sql_answer(question, status_callback)
     else:
         search_query = question
         db = SQLDatabase.from_uri("sqlite:///db/badminton.db")
@@ -109,6 +117,8 @@ def ask(question: str) -> str:
 
         # 최근/마지막 키워드가 있으면 날짜를 먼저 확정하고 검색 쿼리에 반영
         if any(keyword in question for keyword in ["최근", "마지막", "최신", "저번"]):
+            if status_callback:
+                status_callback("date_lookup", "최근 경기 날짜 조회 중...")
             sql_chain = TEXT_TO_SQL_PROMPT | llm | StrOutputParser()
             sql_query = clean_sql(sql_chain.invoke({
                 "input": "가장 최근 경기 날짜가 언제야?",
@@ -116,10 +126,11 @@ def ask(question: str) -> str:
                 "top_k": 1
             }))
             latest_date = db.run(sql_query)
-            # 날짜를 질문 앞에 명시적으로 추가
             search_query = f"{latest_date} 날짜 경기 {question}"
             print(f"🔍 검색 쿼리: {search_query}")
 
+        if status_callback:
+            status_callback("rag_search", "경기 후기 검색 중...")
         chain = get_rag_chain()
         return chain.invoke(search_query)
 
