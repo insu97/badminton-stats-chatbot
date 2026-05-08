@@ -337,11 +337,5 @@ with tab_chat:
     # 질문 입력
     if prompt := st.chat_input("질문을 입력하세요"):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            response = generate_response(prompt)
-            if response:
-                st.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
+        st.session_state["pending_question"] = prompt
+        st.rerun()
