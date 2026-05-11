@@ -13,3 +13,4 @@ langchain-experimental
 streamlit==1.32.0
 altair==4.2.2
 plotly
+streamlit-calendar

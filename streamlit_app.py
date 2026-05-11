@@ -1,6 +1,8 @@
 import os
+import sqlite3
 import streamlit as st
 from dotenv import load_dotenv
+from streamlit_calendar import calendar as st_calendar
 from src.db_loader import load_sheets_to_sqlite
 from src.rag_loader import create_vector_store, load_reviews, split_documents
 from src.chain import ask
@@ -268,7 +270,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # ── 탭 구조 ──
-tab_dashboard, tab_chat = st.tabs(["📊 대시보드", "💬 챗봇"])
+tab_dashboard, tab_chat, tab_review = st.tabs(["📊 대시보드", "💬 챗봇", "📝 후기 작성"])
 
 # ── 대시보드 탭 ──
 with tab_dashboard:
@@ -339,3 +341,233 @@ with tab_chat:
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.session_state["pending_question"] = prompt
         st.rerun()
+
+
+# ── 후기 작성 탭 ──
+def get_match_dates() -> list[str]:
+    """match_records에서 날짜 목록을 내림차순으로 반환"""
+    if not os.path.exists("db/badminton.db"):
+        return []
+    conn = sqlite3.connect("db/badminton.db")
+    try:
+        rows = conn.execute(
+            "SELECT DISTINCT 날짜 FROM match_records ORDER BY 날짜 DESC"
+        ).fetchall()
+        return [r[0] for r in rows]
+    finally:
+        conn.close()
+
+
+def get_matches_for_date(date: str) -> list[dict]:
+    """특정 날짜의 경기 목록을 반환"""
+    conn = sqlite3.connect("db/badminton.db")
+    try:
+        rows = conn.execute(
+            """SELECT rowid, "팀A-1", "팀A-2", "팀B-1", "팀B-2", 점수A, 점수B
+               FROM match_records WHERE 날짜 = ? ORDER BY rowid""",
+            (date,)
+        ).fetchall()
+        matches = []
+        for i, r in enumerate(rows, 1):
+            matches.append({
+                "no": i,
+                "label": f"게임 {i}: {r[1]}·{r[2]} vs {r[3]}·{r[4]}  ({r[5]}:{r[6]})",
+            })
+        return matches
+    finally:
+        conn.close()
+
+
+def load_review_file(date: str) -> str:
+    """날짜에 해당하는 후기 파일 내용을 읽어 반환 (없으면 빈 문자열)"""
+    path = f"data/reviews/{date.replace('-', '')}.txt"
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    return ""
+
+
+def save_review_file(date: str, content: str):
+    """후기 내용을 파일에 저장"""
+    os.makedirs("data/reviews", exist_ok=True)
+    path = f"data/reviews/{date.replace('-', '')}.txt"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
+def rebuild_vector_db():
+    """후기 파일을 다시 읽어 벡터 DB 재생성"""
+    docs = load_reviews()
+    chunks = split_documents(docs)
+    create_vector_store(chunks)
+    st.cache_resource.clear()
+
+
+def get_review_password() -> str:
+    """로컬(.env)과 Streamlit Cloud(secrets) 모두 지원"""
+    try:
+        return st.secrets.get("REVIEW_PASSWORD", os.getenv("REVIEW_PASSWORD", ""))
+    except Exception:
+        return os.getenv("REVIEW_PASSWORD", "")
+
+
+with tab_review:
+    st.markdown("### 📝 경기 후기 작성")
+
+    # ── 로컬 전용 게이트 ──
+    if os.getenv("REVIEW_ENABLED", "").lower() != "true":
+        st.info("📝 후기 작성은 로컬 환경에서만 사용할 수 있습니다.")
+        st.stop()
+
+    # ── 비밀번호 인증 게이트 ──
+    if not st.session_state.get("review_authenticated"):
+        st.markdown(
+            "<p style='color:#90A4AE; font-size:0.9rem;'>후기 작성은 인증된 사용자만 가능합니다.</p>",
+            unsafe_allow_html=True,
+        )
+        pwd_input = st.text_input("비밀번호", type="password", key="review_pwd_input")
+        if st.button("확인", key="review_pwd_submit"):
+            correct = get_review_password()
+            if not correct:
+                st.error("서버에 REVIEW_PASSWORD가 설정되어 있지 않습니다.")
+            elif pwd_input == correct:
+                st.session_state["review_authenticated"] = True
+                st.rerun()
+            else:
+                st.error("비밀번호가 틀렸습니다.")
+        st.stop()
+
+    # 로그아웃
+    col_title, col_logout = st.columns([5, 1])
+    with col_logout:
+        if st.button("🔒 로그아웃", use_container_width=True):
+            st.session_state["review_authenticated"] = False
+            st.rerun()
+
+    # 범례
+    st.markdown(
+        "<div style='display:flex; gap:20px; margin-bottom:12px;'>"
+        "<span><span style='display:inline-block;width:12px;height:12px;"
+        "background:#66BB6A;border-radius:3px;vertical-align:middle;margin-right:5px;'></span>"
+        "<span style='color:#90A4AE;font-size:0.82rem;'>경기 있음 (후기 없음)</span></span>"
+        "<span><span style='display:inline-block;width:12px;height:12px;"
+        "background:#42A5F5;border-radius:3px;vertical-align:middle;margin-right:5px;'></span>"
+        "<span style='color:#90A4AE;font-size:0.82rem;'>후기 작성됨</span></span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    dates = get_match_dates()
+    dates_set = set(dates)
+
+    if not dates:
+        st.warning("경기 데이터가 없습니다. 먼저 데이터를 갱신해주세요.")
+    else:
+        # 달력 이벤트 생성
+        cal_events = []
+        for d in dates:
+            has_review = os.path.exists(f"data/reviews/{d.replace('-', '')}.txt")
+            cal_events.append({
+                "title": "후기 있음" if has_review else "경기",
+                "start": d,
+                "backgroundColor": "#42A5F5" if has_review else "#66BB6A",
+                "borderColor": "#1565C0" if has_review else "#2E7D32",
+                "textColor": "#ffffff",
+                "allDay": True,
+            })
+
+        cal_options = {
+            "initialView": "dayGridMonth",
+            "locale": "ko",
+            "headerToolbar": {
+                "left": "prev,next today",
+                "center": "title",
+                "right": "",
+            },
+            "selectable": True,
+            "height": 500,
+            "dayMaxEvents": True,
+            "eventDisplay": "block",
+        }
+
+        custom_css = """
+        .fc { background: transparent; }
+        .fc-toolbar-title { font-size: 1.05rem !important; font-weight: 700; }
+        .fc-button-primary {
+            background-color: #2E7D32 !important;
+            border-color: #2E7D32 !important;
+            font-size: 0.8rem !important;
+        }
+        .fc-button-primary:hover {
+            background-color: #388E3C !important;
+            border-color: #388E3C !important;
+        }
+        .fc-day-today { background: rgba(102,187,106,0.08) !important; }
+        .fc-event { cursor: pointer; border-radius: 4px !important; font-size: 0.75rem !important; }
+        """
+
+        cal_state = st_calendar(
+            events=cal_events,
+            options=cal_options,
+            custom_css=custom_css,
+            key="review_calendar",
+        )
+
+        # 클릭 이벤트에서 날짜 추출 후 session_state에 저장
+        if cal_state.get("dateClick"):
+            clicked = cal_state["dateClick"]["date"][:10]
+            if clicked in dates_set:
+                st.session_state["review_selected_date"] = clicked
+        elif cal_state.get("eventClick"):
+            clicked = cal_state["eventClick"]["event"]["start"][:10]
+            st.session_state["review_selected_date"] = clicked
+
+        selected_date = st.session_state.get("review_selected_date")
+
+        if not selected_date:
+            st.info("📅 달력에서 경기가 있는 날짜를 클릭하세요.")
+        else:
+            st.divider()
+            st.markdown(
+                f"<p style='font-weight:700; color:#C8E6C9; font-size:1rem;'>선택된 날짜: {selected_date}</p>",
+                unsafe_allow_html=True,
+            )
+
+            # 경기 목록
+            matches = get_matches_for_date(selected_date)
+            if matches:
+                with st.expander("📋 해당 날짜 경기 목록", expanded=True):
+                    for m in matches:
+                        st.markdown(
+                            f"<div style='padding:5px 0; color:#C8E6C9; font-size:0.9rem;'>• {m['label']}</div>",
+                            unsafe_allow_html=True,
+                        )
+
+            # 기존 후기 불러오기
+            existing_content = load_review_file(selected_date)
+            is_new = existing_content == ""
+            status_color = "#90A4AE" if is_new else "#66BB6A"
+            status_text = "✏️ 새 후기 작성" if is_new else "📄 기존 후기 수정"
+            st.markdown(
+                f"<p style='font-size:0.85rem; color:{status_color};'>{status_text}</p>",
+                unsafe_allow_html=True,
+            )
+
+            review_content = st.text_area(
+                label="후기 내용",
+                value=existing_content,
+                height=320,
+                placeholder=f"게임 1: [선수명] ...\n게임 2: [선수명] ...\n\n날짜: {selected_date}",
+                key=f"review_text_{selected_date}",
+            )
+
+            if st.button("💾 저장 및 벡터 DB 갱신", type="primary"):
+                if not review_content.strip():
+                    st.error("내용을 입력해주세요.")
+                else:
+                    with st.spinner("저장 중..."):
+                        save_review_file(selected_date, review_content)
+                    with st.spinner("벡터 DB 재생성 중..."):
+                        rebuild_vector_db()
+                    st.success(f"✅ {selected_date} 후기가 저장되었으며 벡터 DB가 갱신되었습니다.")
+                    st.rerun()

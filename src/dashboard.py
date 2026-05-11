@@ -45,7 +45,7 @@ def get_seasons() -> list:
 
 def render_kpi_cards(player_df: pd.DataFrame):
     """KPI 카드 4개 렌더링"""
-    total_games = int(player_df["총경기"].sum() // 2)  # 2명씩 한 경기
+    total_games = int(player_df["총경기"].sum() // 4)  # 경기당 4명(팀A 2 + 팀B 2)
     # 최다승: 동률 선수 모두 표시 (승률 높은 순 → 경기수 많은 순)
     max_wins = player_df["승리"].max()
     top_winners = (
